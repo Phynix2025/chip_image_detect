@@ -26,46 +26,58 @@ DetectResult DefectAlgorithm::detect(const QImage &input,const QImage &standard)
     return res;
 }
 
-QImage DefectAlgorithm::simpleTemplateMatch(const QImage &input,const QImage &standard){
-    //模板与模板对应位置逐像素作差，记录左上角位置，所有像素差的和最小值对应的就是最佳位置
+QImage DefectAlgorithm::simpleTemplateMatch(const QImage &input, const QImage &standard) {
+
     int minV = INT_MAX;
-    int hStandard = standard.height(),wStandard = standard.width();
-    int hInput = input.height(),wInput = input.width();
-    for(int x = 0; x <= wInput - wStandard; ++ x){
-        for(int y = 0; y <= hInput - hStandard; ++ y){
-            //对于第一个位置
-            const uchar *pStd = standard.constBits();
-            const uchar *pIpt = input.constBits();
+    int matchX = 0, matchY = 0; // 赋初值，防止找不到时变成野值
+    int hStandard = standard.height(), wStandard = standard.width();
+    int hInput = input.height(), wInput = input.width();
+
+    // 提到底层循环外部，避免重复调用函数，提升性能
+    const uchar *pStd = standard.constBits();
+    const uchar *pIpt = input.constBits();
+    int stdBpl = standard.bytesPerLine();
+    int iptBpl = input.bytesPerLine();
+
+    // 【优化】外层循环 y，内层循环 x，符合图像在内存中按行存储的顺序，大幅提升读取速度
+    for(int y = 0; y <= hInput - hStandard; ++y) {
+        for(int x = 0; x <= wInput - wStandard; ++x) {
             int diff = 0;
-            for(int i = 0; i < hStandard; ++ i){
-                for(int j = 0; j < wStandard; ++ j){
-                    int offset1 = standard.bytesPerLine() * i + j; //模板图的指针偏移
-                    int offset2 = input.bytesPerLine() * (y + i) + j + x; //input 的指针偏移
+            for(int i = 0; i < hStandard; ++i) {
+                for(int j = 0; j < wStandard; ++j) {
+                    int offset1 = stdBpl * i + j; 
+                    int offset2 = iptBpl * (y + i) + (x + j); // 加括号逻辑更清晰
                     diff += std::abs(pStd[offset1] - pIpt[offset2]);
                 }
             }
-            //这个位置计算完后
-            if(diff < minV){
+            
+            // 【修复 Bug 1】：记录最小差值的同时，必须更新 minV
+            if(diff < minV) {
+                minV = diff;
                 matchX = x;
                 matchY = y;
             }
         }
     }
     
-    //测试
+    // -------- 测试：绘制白色矩形框 --------
     QImage res = input.copy();
     uchar *data = res.bits();
-    for(int i = matchX; i < matchX + wStandard; ++ i){
-        data[matchY * res.bytesPerLine() + i] = 255;
+    int resBpl = res.bytesPerLine();
+
+    // 【修复 Bug 2】：边界坐标需要 -1，防止刚好在图像边缘时越界
+    int rightEdge = matchX + wStandard - 1;
+    int bottomEdge = matchY + hStandard - 1;
+
+    // 画上下边缘
+    for(int i = matchX; i <= rightEdge; ++i) {
+        data[matchY * resBpl + i] = 255;      // 上边
+        data[bottomEdge * resBpl + i] = 255;  // 下边
     }
-    for(int i = matchX; i < matchX + wStandard; ++ i){
-        data[(matchY + hStandard )* res.bytesPerLine() + i] = 255;
-    }
-    for(int i = matchY; i < matchY + hStandard; ++ i){
-        data[i * res.bytesPerLine() + matchX] = 255;
-    }
-    for(int i = matchY; i < matchY + hStandard; ++ i){
-        data[i * res.bytesPerLine() + matchX + wStandard] = 255;
+    // 画左右边缘
+    for(int i = matchY; i <= bottomEdge; ++i) {
+        data[i * resBpl + matchX] = 255;      // 左边
+        data[i * resBpl + rightEdge] = 255;   // 右边
     }
 
     return res;

@@ -18,10 +18,14 @@
 #include <QMenu>
 #include <qaction.h>
 #include <qcoreapplication.h>
+#include <qdir.h>
 #include <qfiledialog.h>
+#include <qglobal.h>
+#include <qimage.h>
 #include <qmessagebox.h>
 #include <qobject.h>
 #include <utility>
+#include <QDebug>
 
 
 MainWindow::MainWindow(QWidget *parent)
@@ -175,13 +179,34 @@ void MainWindow::onActionOpen(){
     //打开缺陷图片所在的文件夹
     QDir dir{QCoreApplication::applicationDirPath()};
     dir.cdUp();
-    QString dirPath = dir.absolutePath() + "/data";
+    //采用 QDir::fromNativeSeparators() 根据操作系统返回合适的分隔符，如：“\\” - windows
+    QString dirPath = dir.absolutePath() + QDir::fromNativeSeparators("/data") ;
     //提示用户打开缺陷图片所在的文件夹
     QString dirName = QFileDialog::getExistingDirectory(this,"打开文件夹",dirPath);
     //得到目录
     currentImageDir = std::move(dirName);
+    //获取标准图像
+    QDir dirStd(currentImageDir); //标准图像路径
+    dirStd.cdUp();
+    if(!dirStd.cd("standard")){
+        QMessageBox::warning(this,"错误","没有 standard 文件夹");
+        return;
+    }
+    QStringList nameFilters;  //过滤器，只要图片类型文件
+    nameFilters << "*.png" << "*.jpg" << "*.jpeg" << "*.bmp" << "*.tif";
+    imageFiles = dirStd.entryList(nameFilters, QDir::Files | QDir::NoSymLinks, QDir::Name);
+
+    if(imageFiles.isEmpty()){
+        QMessageBox::warning(this,"错误","standard 目录下没有图片");
+    }
+    //标准图像路径 拼接
+    QString imgPath = dirStd.absolutePath();
+    imgPath += QDir::fromNativeSeparators("/") + imageFiles[0];
     
-    loadImages();
+    //读取 作为模板图
+    standard = QImage(imgPath);
+
+    loadImages(); //加载缺陷图相关信息
 }
 
 void MainWindow::loadImages() {
@@ -200,7 +225,7 @@ void MainWindow::loadImages() {
         currentIndex = 0;
         updateImageDisplay();
     } else {
-        // 更新了提示信息，方便你在界面上直观看到它到底去哪个绝对路径找图片了
+        // 更新了提示信息，方便在界面上看到去哪个绝对路径找图片了
         imageScene->addText(QString("未在 \n%1 \n找到图片").arg(currentImageDir))->setDefaultTextColor(Qt::white);
         btnPrev->setEnabled(false);
         btnNext->setEnabled(false);
