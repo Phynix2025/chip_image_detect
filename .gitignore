@@ -1,0 +1,4 @@
+.cache/
+.qtcreator/
+.vscode/
+build/
