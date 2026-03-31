@@ -32,7 +32,7 @@ private slots:
     //工具栏与撤销操作槽函数
     void onActionOpen();
     void onActionSaveAs();
-    void onActionDetect();
+    //void onActionDetect();
     void onUndo();
     //处理接收子线程处理完毕的信号
     void onProcessingFinished(QImage resultImage,QString message);

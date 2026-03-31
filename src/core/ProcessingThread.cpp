@@ -6,6 +6,7 @@ ProcessingThread::ProcessingThread(TaskType type, const QImage &inputImage, cons
                     ,const QImage &standard,QObject *parent)
     : QThread(parent), m_taskType(type), m_inputImage(inputImage),m_oriImage(oriImage),m_standardImage(
         standard) {
+
 }
 
 void ProcessingThread::run() {
@@ -35,6 +36,16 @@ void ProcessingThread::run() {
             msg = "拉普拉斯锐化完成";
             break;
         }     
+        case TwoWayFilter: {
+            resultImg = PixelProcessor::twoWayFilter(m_inputImage);
+            msg = "双边滤波完成";
+            break;
+        }
+        case Retinex: {
+            resultImg = PixelProcessor::Retinex(m_inputImage);
+            msg = "Retinex 完成";
+            break;
+        }
         case AdaptiveThresh:{
             resultImg = PixelProcessor::adaptiveThreshold(m_inputImage); 
             msg = "自适应阈值分割完成"; 
@@ -64,13 +75,47 @@ void ProcessingThread::run() {
             resultImg = PixelProcessor::prewitt(m_inputImage); 
             msg = "Prewitt边缘提取完成"; 
             break;
-        }       
-        case Detect: {
-            DetectResult res = DefectAlgorithm::detect(m_inputImage,m_standardImage);
-            resultImg = res.resultImage; 
-            msg = res.message; 
+        }     
+        /*TemplateMatch,ImageDiff,ThreshSeg,PointLink,DefectAnalysis  // 缺陷检测*/  
+        case TemplateMatch: {
+            DetectResult res = DefectAlgorithm::templateMatch(m_inputImage, m_standardImage);
+            resultImg = res.resultImage;
+            msg = res.message;
             break;
         }
+        case ImageDiff: {
+            DetectResult res = DefectAlgorithm::imageDiff(m_inputImage, m_standardImage);
+            resultImg = res.resultImage;
+            msg = res.message;
+            
+            break;
+        }
+        case ThreshSeg: {
+            DetectResult res = DefectAlgorithm::threshSeg(m_inputImage);
+            resultImg = res.resultImage;
+            msg = res.message;
+            
+            break;
+        }
+        case PointLink: {
+            DetectResult res = DefectAlgorithm::pointLink(m_inputImage);
+            resultImg = res.resultImage;
+            msg = res.message;
+            
+            break;
+        }
+        case DefectAnalysis: {
+            DetectResult res = DefectAlgorithm::defectAnalysis(m_inputImage);
+            resultImg = res.resultImage;
+            msg = res.message;
+            
+            break;
+        }
+        default: {
+            msg = "传入线程的操作有误！请重试。";
+            break;
+        }
+
     }
 
     // 处理完毕，发射信号将数据安全投递回主线程

@@ -9,7 +9,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 解决Anaconda 冲突警告
+# 忽略 anaconda 自带的 Qt库，使用我配置的Qt库
 set(CMAKE_IGNORE_PATH "/home/phynix/anaconda3/lib")
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)

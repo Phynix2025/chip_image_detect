@@ -531,3 +531,150 @@ QImage PixelProcessor::prewitt(const QImage &input) {
     }
     return dst;
 }
+
+// 双边滤波
+QImage PixelProcessor::twoWayFilter(const QImage &input) {
+    QImage gray = toGray(input);
+    int width = gray.width();
+    int height = gray.height();
+    QImage output(width, height, QImage::Format_Grayscale8);
+
+    const int radius = 3;       
+    const float sigmaColor = 30.0f; 
+    const float sigmaSpace = 3.0f;  
+
+    const uchar *inData = gray.constBits();
+    uchar *outData = output.bits();
+    int bpl = gray.bytesPerLine();
+
+    // 预计算空间权重 
+    float spaceWeight[radius * 2 + 1][radius * 2 + 1];
+    for (int i = -radius; i <= radius; ++i) {
+        for (int j = -radius; j <= radius; ++j) {
+            spaceWeight[i + radius][j + radius] = std::exp(-(i * i + j * j) / (2 * sigmaSpace * sigmaSpace));
+        }
+    }
+
+    //计算颜色权重查表 (LUT)
+    //差值范围是 -255 到 255，平移 255 后存入 0 到 510 的数组下标
+    float colorWeightLUT[512]; 
+    for (int i = -255; i <= 255; ++i) {
+        colorWeightLUT[i + 255] = std::exp(-(i * i) / (2.0f * sigmaColor * sigmaColor));
+    }
+
+    // 边界判断
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            float weightSum = 0.0f;
+            float pixelSum = 0.0f;
+            int centerVal = inData[y * bpl + x];
+
+            for (int dy = -radius; dy <= radius; ++dy) {
+                int ny = y + dy;
+                // 将 Y 轴的边界判断提到外层，减少内层判断次数
+                if (ny < 0 || ny >= height) continue; 
+                
+                // 避免重复乘法
+                const uchar* rowPtr = inData + ny * bpl;
+
+                for (int dx = -radius; dx <= radius; ++dx) {
+                    int nx = x + dx;
+                    // X 轴边界判断
+                    if (nx < 0 || nx >= width) continue;
+
+                    int neighborVal = rowPtr[nx];
+                    int diff = centerVal - neighborVal;
+                    float w = spaceWeight[dy + radius][dx + radius] * colorWeightLUT[diff + 255];
+                    
+                    pixelSum += w * neighborVal;
+                    weightSum += w;
+                }
+            }
+            outData[y * bpl + x] = static_cast<uchar>(std::round(pixelSum / weightSum));
+        }
+    }
+    return output;
+}
+
+QImage PixelProcessor::Retinex(const QImage &input) {
+    QImage gray = toGray(input); 
+    int width = gray.width();
+    int height = gray.height();
+    QImage output(width, height, QImage::Format_Grayscale8);
+
+    int inBpl = gray.bytesPerLine();
+    int outBpl = output.bytesPerLine();
+    const uchar *inData = gray.constBits();
+    uchar *outData = output.bits();
+
+    // 计算积分图
+    int intWidth = width + 1;
+    // 使用 long long 防止像素累加后数值溢出
+    std::vector<long long> integral((height + 1) * intWidth, 0);
+
+    for (int y = 0; y < height; ++y) {
+        long long rowSum = 0;
+        const uchar *row = inData + y * inBpl;
+        for (int x = 0; x < width; ++x) {
+            rowSum += row[x];
+            // 积分图公式：当前点 = 上方点 + 当前行累加和
+            integral[(y + 1) * intWidth + (x + 1)] = integral[y * intWidth + (x + 1)] + rowSum;
+        }
+    }
+
+    // 单尺度 Retinex (SSR) 计算
+    // 取芯片图像较短边的 1/10 到 1/5 左右
+    int radius = std::min(width, height) / 5; 
+    
+    std::vector<float> retinexValues(width * height);
+    float minVal = 1e9f, maxVal = -1e9f;
+
+    for (int y = 0; y < height; ++y) {
+        const uchar *row = inData + y * inBpl;
+        for (int x = 0; x < width; ++x) {
+            // 计算局部窗口的坐标边界，防止越界
+            int y1 = std::max(0, y - radius);
+            int y2 = std::min(height, y + radius + 1);
+            int x1 = std::max(0, x - radius);
+            int x2 = std::min(width, x + radius + 1);
+
+            // 利用积分图 求出任意窗口的像素总和
+            long long areaSum = integral[y2 * intWidth + x2] 
+                              - integral[y1 * intWidth + x2] 
+                              - integral[y2 * intWidth + x1] 
+                              + integral[y1 * intWidth + x1];
+            int count = (y2 - y1) * (x2 - x1);
+            
+            // L: 局部均值作为光照分量估计
+            float L = static_cast<float>(areaSum) / count;
+            // S: 原图像素值
+            float S = row[x];
+
+            // Retinex 对数域相减公式：R = log(S) - log(L)
+            //  1.0f 是为了防止出现对数零 )
+            float R = std::log(S + 1.0f) - std::log(L + 1.0f);
+            
+            retinexValues[y * width + x] = R;
+            
+            // 记录全局最大最小值，用于之后的对比度拉伸
+            if (R < minVal) minVal = R;
+            if (R > maxVal) maxVal = R;
+        }
+    }
+
+    // 线性拉伸归一化，将浮点数结果映射回 [0, 255]
+    float range = maxVal - minVal;
+    // 如果整张图是纯色，防止除以零崩溃
+    if (range < 1e-5f) range = 1.0f; 
+
+    for (int y = 0; y < height; ++y) {
+        uchar *outRow = outData + y * outBpl;
+        for (int x = 0; x < width; ++x) {
+            // 线性映射
+            float val = (retinexValues[y * width + x] - minVal) / range * 255.0f;
+            outRow[x] = static_cast<uchar>(std::max(0, std::min(255, static_cast<int>(val))));
+        }
+    }
+
+    return output;
+}

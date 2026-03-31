@@ -22,8 +22,10 @@
 #include <qfiledialog.h>
 #include <qglobal.h>
 #include <qimage.h>
+#include <qmenu.h>
 #include <qmessagebox.h>
 #include <qobject.h>
+#include <qtoolbutton.h>
 #include <utility>
 #include <QDebug>
 
@@ -61,6 +63,10 @@ void MainWindow::setupUi() {
     menuPre->addAction("直方图均衡化", this, [this](){ startProcessingTask(ProcessingThread::HistEq); });
     menuPre->addAction("高斯滤波", this, [this](){ startProcessingTask(ProcessingThread::Gaussian); });
     menuPre->addAction("拉普拉斯锐化", this, [this](){ startProcessingTask(ProcessingThread::Laplacian); });
+    // 加入双边滤波
+    menuPre->addAction("双边滤波",this,[this]() {startProcessingTask(ProcessingThread::TwoWayFilter); });
+    // 图像增强
+    menuPre->addAction("Retinex 增强",this,[this]() {startProcessingTask(ProcessingThread::Retinex); });
     btnPre->setMenu(menuPre);
     toolbar->addWidget(btnPre);
 
@@ -86,10 +92,18 @@ void MainWindow::setupUi() {
     btnExt->setMenu(menuExt);
     toolbar->addWidget(btnExt);
 
-    // --- 缺陷检测 ---
-    QAction *actDetect = toolbar->addAction("缺陷检测");
-    connect(actDetect, &QAction::triggered, this, &MainWindow::onActionDetect);
-    
+    // --- 缺陷检测菜单 ---
+    QToolButton *btnDet = new QToolButton(this);
+    btnDet->setText("缺陷检测");
+    btnDet->setPopupMode(QToolButton::InstantPopup);
+    QMenu *menuDet = new QMenu(this);
+    menuDet->addAction("模板匹配",this,[this](){startProcessingTask(ProcessingThread::TemplateMatch); });
+    menuDet->addAction("图像差分",this,[this]() {startProcessingTask(ProcessingThread::ImageDiff); });
+    menuDet->addAction("阈值分割",this,[this]() {startProcessingTask(ProcessingThread::ThreshSeg); });
+    menuDet->addAction("断点连接",this,[this]() {startProcessingTask(ProcessingThread::PointLink);} );
+    menuDet->addAction("缺陷分析",this,[this]() {startProcessingTask(ProcessingThread::DefectAnalysis);} );
+    btnDet->setMenu(menuDet);
+    toolbar->addWidget(btnDet);
 
     // ====================
     // 2. 核心布局 (3:2 分配)
@@ -333,10 +347,6 @@ void MainWindow::onProcessingFinished(QImage resultImage,QString message){
     applyProcessedImage(resultImage,message);
 }
 
-
-void MainWindow::onActionDetect() {
-    startProcessingTask(ProcessingThread::Detect);
-}
 
 void MainWindow::onActionSaveAs() {
     if (currentImage.isNull()) return;

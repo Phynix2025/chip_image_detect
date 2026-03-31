@@ -3,6 +3,7 @@
 
 #include <QImage>
 #include <QString>
+#include <qimage.h>
 
 class PixelProcessor {
 public:
@@ -15,6 +16,8 @@ public:
     static QImage histEqualize(const QImage &input);
     static QImage gaussianBlur(const QImage &input);
     static QImage laplacian(const QImage &input);
+    static QImage twoWayFilter(const QImage &input); // 双边滤波
+    static QImage Retinex(const QImage &input);
 
     // 分割
     static QImage adaptiveThreshold(const QImage &input);

@@ -10,12 +10,13 @@ class ProcessingThread : public QThread {
     Q_OBJECT
 
 public:
+
     // 定义任务类型枚举，复用同一个线程类
     enum TaskType {
-        LinearStretch, HistEq, Gaussian, Laplacian,  // 预处理
+        LinearStretch, HistEq, Gaussian, Laplacian, TwoWayFilter,Retinex, // 预处理
         AdaptiveThresh, Otsu,                        // 分割
         MorphOpen, MorphClose, Sobel, Prewitt,       // 特征提取
-        Detect                                       // 缺陷检测
+        TemplateMatch,ImageDiff,ThreshSeg,PointLink,DefectAnalysis  // 缺陷检测
     };
 
     ProcessingThread(TaskType type, const QImage &inputImage, const QImage &oriImage
@@ -26,7 +27,7 @@ protected:
     void run() override;
 
 signals:
-    // 跨线程传递结果的关键信号
+    // 跨线程传递结果
     void resultReady(QImage resultImage, QString message);
 
 private:
