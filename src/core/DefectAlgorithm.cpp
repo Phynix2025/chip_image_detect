@@ -10,30 +10,48 @@
 #include <cmath>
 #include <algorithm>
 
+/* 辅助函数 */
 // 暴力匹配
 QImage forceTemplateMatch(const QImage &input,const QImage &standard);
 // 图像金字塔
 QImage pyramidTemplateMatch(const QImage &input, const QImage &standard);
+// 逐像素作差
+QImage perBytesDiff(const QImage &input,const QImage &standard);
+// 局部均值作差
+QImage localMeanDiff(const QImage &input,const QImage &standard);
 
+/* 计算主函数 */
+// 模板匹配
 DetectResult DefectAlgorithm::templateMatch(QImage &input,QImage &standard){
     DetectResult res;
     // 优化：在模板匹配之前预处理，减少噪点光照等因素干扰
-    
+    standard = PixelProcessor::twoWayFilter(standard);
+    standard = PixelProcessor::Retinex(standard);
+    standard = PixelProcessor::sobel(standard);
+
+    input = PixelProcessor::twoWayFilter(input);
+    input = PixelProcessor::Retinex(input);
+    input = PixelProcessor::sobel(input);
+
+
     res.resultImage = pyramidTemplateMatch(input, standard);
-    res.message = "模板匹配完成";
+    res.message = "模板匹配完成(已预处理)";
+
     return res;
 }
 
+// 图像差分
 DetectResult DefectAlgorithm::imageDiff(const QImage &input,const QImage &standard){
     DetectResult res;
-    
+    //res.resultImage = perBytesDiff(input, standard);
+    res.resultImage = localMeanDiff(input, standard);
     res.message = "图像差分完成";
     return res;
 }
 
 DetectResult DefectAlgorithm::threshSeg(const QImage &input){
     DetectResult res;
-    
+    res.resultImage =  PixelProcessor::otsuThreshold(input);
     res.message = "阈值分割完成";
     return res;
 }
@@ -126,7 +144,7 @@ QImage pyramidTemplateMatch(const QImage &input, const QImage &standard) {
                                   guessY1 - searchRadius, guessY1 + searchRadius);
 
 
-    //向最底层 (L0, 原图) 投影并微调=
+    //向最底层 (L0, 原图) 投影并微调
     // 将 L1 找到的坐标再放大 2 倍
     int guessX0 = bestL1.x() * 2;
     int guessY0 = bestL1.y() * 2;
@@ -188,4 +206,65 @@ QImage forceTemplateMatch(const QImage &input, const QImage &standard) {
     QImage res = input.copy(matchX, matchY, wStandard, hStandard);
 
     return res;  
+}
+
+// 逐像素作差
+QImage perBytesDiff(const QImage &input,const QImage &standard){
+    QImage res = input.copy();
+    // 图像大小
+    const int wStd = standard.width(),hStd = standard.height();
+    const int wIpt = input.width(),hIpt = input.height();
+    // 差分图大小，防止指针越界（虽然正常处理不会越界，但是防止用户有错误操作）
+    const int wRes = std::min(wStd,wIpt),hRes = std::min(hStd,hIpt);
+    // 每一行内存字节数
+    const int lRes = std::min(input.bytesPerLine(),standard.bytesPerLine()); 
+
+    const uchar *pIpt = input.constBits();
+    const uchar *pStd = standard.constBits();
+    uchar *pRes = res.bits();
+    
+    for(int y = 0; y < hRes; ++ y){
+        for(int x = 0; x < wRes; ++ x){
+            int offset = x + y * lRes; // 指针偏移量
+            pRes[offset] = std::abs(static_cast<int>(pIpt[offset]) - pStd[offset]);
+        }
+    }
+
+    // 后处理：去除小影响,噪点
+    res = PixelProcessor::twoWayFilter(res);
+
+    return res;
+}
+
+// 局部均值作差
+QImage localMeanDiff(const QImage &input,const QImage &standard){
+    QImage res = input.copy();
+    // 图像大小
+    const int wStd = standard.width(),hStd = standard.height();
+    const int wIpt = input.width(),hIpt = input.height();
+    // 差分图大小，防止指针越界（虽然正常处理不会越界，但是防止用户有错误操作）
+    const int wRes = std::min(wStd,wIpt),hRes = std::min(hStd,hIpt);
+    // 每一行内存字节数
+    const int lRes = std::min(input.bytesPerLine(),standard.bytesPerLine()); 
+
+    const uchar *pIpt = input.constBits();
+    const uchar *pStd = standard.constBits();
+    uchar *pRes = res.bits();
+    
+    // 跳过边缘
+    for(int y = 1; y < hRes - 1; ++ y){
+        for(int x = 1; x < wRes - 1; ++ x){
+            int offset = x + y * lRes; // 指针偏移量
+            uchar meanIpt = (static_cast<int>(pIpt[offset - lRes]) + pIpt[offset + lRes] + pIpt[offset - 1]
+                            + pIpt[offset + 1] + pIpt[offset]) / 5;
+            uchar meanStd = (static_cast<int>(pStd[offset - lRes]) + pStd[offset + lRes] + pStd[offset - 1]
+                            + pStd[offset + 1] + pStd[offset])  / 5;
+            pRes[offset] = std::abs(static_cast<int>(meanIpt) - meanStd);
+        }
+    }
+
+    // 后处理：去除小影响,噪点
+    res = PixelProcessor::twoWayFilter(res);
+
+    return res;
 }
