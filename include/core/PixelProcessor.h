@@ -4,6 +4,7 @@
 #include <QImage>
 #include <QString>
 #include <qimage.h>
+#include <qtypes.h>
 
 class PixelProcessor {
 public:
@@ -22,6 +23,7 @@ public:
     // 分割
     static QImage adaptiveThreshold(const QImage &input);
     static QImage otsuThreshold(const QImage &input);
+    static QImage fixedThreshold(const QImage &input,uchar thres);
 
     // 特征提取
     static QImage morphOpen(const QImage &input);

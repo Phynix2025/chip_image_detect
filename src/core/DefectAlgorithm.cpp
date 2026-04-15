@@ -3,12 +3,14 @@
 
 #include <climits>
 #include <cstdlib>
+#include <functional>
 #include <qimage.h>
 #include <qtypes.h>
 #include <QImage>
 #include <QPoint>
 #include <cmath>
 #include <algorithm>
+#include <vector> 
 
 /* 辅助函数 */
 // 暴力匹配
@@ -51,14 +53,59 @@ DetectResult DefectAlgorithm::imageDiff(const QImage &input,const QImage &standa
 
 DetectResult DefectAlgorithm::threshSeg(const QImage &input){
     DetectResult res;
-    res.resultImage =  PixelProcessor::otsuThreshold(input);
+    res.resultImage = PixelProcessor::fixedThreshold(input,50);
     res.message = "阈值分割完成";
     return res;
 }
 
 DetectResult DefectAlgorithm::pointLink(const QImage &input){
     DetectResult res;
-    
+    // 首先采用 3*3 模板 开运算（腐蚀+膨胀）
+    QImage dst = input.copy();
+    int w = dst.width(), h = dst.height(), stride = dst.bytesPerLine();
+    uchar *pDst = dst.bits();
+    const uchar *pIpt = input.constBits();
+
+    //腐蚀
+    for (int i = 1; i < h -1; ++ i) {
+        for (int j = 1; j < w -1; ++ j) {
+            int offset = i * stride + j; //中心点偏移量
+            uchar minV = 255;
+
+            for(int dy = -1; dy <= 1; ++ dy){
+                for(int dx = -1; dx <= 1; ++ dx){
+                    int tmp_off = offset + dy * stride + dx;
+                    if(pIpt[tmp_off] < minV){
+                        minV = pIpt[tmp_off];
+                    }
+                }
+            }
+
+            pDst[offset] = minV;
+        }
+    }
+
+    res.resultImage = dst.copy();
+    uchar *pRes = res.resultImage.bits();
+    //膨胀
+    for (int i = 1; i < h -1; ++ i) {
+        for (int j = 1; j < w -1; ++ j) {
+            int offset = i * stride + j; //中心点偏移量
+            uchar maxV = 0;
+
+            for(int dy = -1; dy <= 1; ++ dy){
+                for(int dx = -1; dx <= 1; ++ dx){
+                    int tmp_off = offset + dy * stride + dx;
+                    if(pDst[tmp_off] > maxV){
+                        maxV = pDst[tmp_off];
+                    }
+                }
+            }
+
+            pRes[offset] = maxV;
+        }
+    }
+
     res.message = "断点连接完成";
     return res;
 }
@@ -226,7 +273,12 @@ QImage perBytesDiff(const QImage &input,const QImage &standard){
     for(int y = 0; y < hRes; ++ y){
         for(int x = 0; x < wRes; ++ x){
             int offset = x + y * lRes; // 指针偏移量
-            pRes[offset] = std::abs(static_cast<int>(pIpt[offset]) - pStd[offset]);
+            //pRes[offset] = std::abs(static_cast<int>(pIpt[offset]) - pStd[offset]);
+
+            int tmp1 = static_cast<int>(pIpt[offset]);
+            int tmp2 = static_cast<int>(pStd[offset]);
+            //由于芯片是暗色的，缺陷是相对明亮的，所以采用正向截断法
+            pRes[offset] =static_cast<uchar>(std::min(255,std::max(0,tmp1 - tmp2))) ;
         }
     }
 
@@ -237,33 +289,44 @@ QImage perBytesDiff(const QImage &input,const QImage &standard){
 }
 
 // 局部均值作差
-QImage localMeanDiff(const QImage &input,const QImage &standard){
-    QImage res = input.copy();
-    // 图像大小
-    const int wStd = standard.width(),hStd = standard.height();
-    const int wIpt = input.width(),hIpt = input.height();
-    // 差分图大小，防止指针越界（虽然正常处理不会越界，但是防止用户有错误操作）
-    const int wRes = std::min(wStd,wIpt),hRes = std::min(hStd,hIpt);
-    // 每一行内存字节数
-    const int lRes = std::min(input.bytesPerLine(),standard.bytesPerLine()); 
+QImage localMeanDiff(const QImage &input, const QImage &standard) {
+    // 这里假设已经金字塔对齐并裁剪好了
+    int width = std::min(input.width(), standard.width());
+    int height = std::min(input.height(), standard.height());
+
+    // 由于差分图计算时跳过边缘，所以初始化为一张全黑图
+    QImage res(width, height, QImage::Format_Grayscale8);
+    res.fill(0); // 全部填充为黑色
+
+    // 三张图的独立换行步长
+    int iptBpl = input.bytesPerLine();
+    int stdBpl = standard.bytesPerLine();
+    int resBpl = res.bytesPerLine();
 
     const uchar *pIpt = input.constBits();
     const uchar *pStd = standard.constBits();
     uchar *pRes = res.bits();
     
-    // 跳过边缘
-    for(int y = 1; y < hRes - 1; ++ y){
-        for(int x = 1; x < wRes - 1; ++ x){
-            int offset = x + y * lRes; // 指针偏移量
-            uchar meanIpt = (static_cast<int>(pIpt[offset - lRes]) + pIpt[offset + lRes] + pIpt[offset - 1]
-                            + pIpt[offset + 1] + pIpt[offset]) / 5;
-            uchar meanStd = (static_cast<int>(pStd[offset - lRes]) + pStd[offset + lRes] + pStd[offset - 1]
-                            + pStd[offset + 1] + pStd[offset])  / 5;
-            pRes[offset] = std::abs(static_cast<int>(meanIpt) - meanStd);
+    // 跳过边缘 
+    for(int y = 1; y < height - 1; ++y) {
+        for(int x = 1; x < width - 1; ++x) {
+            int oIpt = y * iptBpl + x;
+            int oStd = y * stdBpl + x;
+            int oRes = y * resBpl + x;
+
+            // 计算均值 
+            int meanIpt = (pIpt[oIpt - iptBpl] + pIpt[oIpt + iptBpl] + 
+                           pIpt[oIpt - 1] + pIpt[oIpt + 1] + pIpt[oIpt]) / 5;
+                           
+            int meanStd = (pStd[oStd - stdBpl] + pStd[oStd + stdBpl] + 
+                           pStd[oStd - 1] + pStd[oStd + 1] + pStd[oStd]) / 5;
+            
+            meanIpt = std::min(255,std::max(0,meanIpt - meanStd));
+            pRes[oRes] = static_cast<uchar>(meanIpt);
         }
     }
 
-    // 后处理：去除小影响,噪点
+    // 去除小噪点
     res = PixelProcessor::twoWayFilter(res);
 
     return res;

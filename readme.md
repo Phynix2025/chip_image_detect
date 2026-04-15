@@ -31,4 +31,15 @@
         不足的是：匹配速度还是有点慢，先把整体大概流程走完，后续考虑**多线程加速计算**
     2. 注意：Qt 等几乎所有的图像处理库都默认会补齐每一行为4倍数 - 内存对齐，加快cpu处理速度。
         所以，每一行逻辑数量 = width(),**实际内存空间 = bytesPerLine()**;
+### 4.15
+    1. 不知道为什么，在图像差分这个地方：
+    ```cpp
+    //pRes[offset] = std::abs(static_cast<int>(pIpt[offset]) - pStd[offset]);
+
+    int tmp1 = static_cast<int>(pIpt[offset]);
+    int tmp2 = static_cast<int>(pStd[offset]);
+    pRes[offset] =static_cast<uchar>(std::min(255,std::max(0,tmp1 - tmp2))) ;
+    // 这里被注释掉的方法会把芯片圆点变成亮色（本来相减之后应该是暗色）
+    ```
+    2. 做到现在，这个断点连接：开运算把图像变得稀稀疏疏的碎点，不好搞啊！！！
 

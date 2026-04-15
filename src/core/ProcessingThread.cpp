@@ -17,9 +17,9 @@ void ProcessingThread::run() {
     // 根据任务类型，调用对应的底层算法（此时运行在子线程中，不会阻塞UI）
     switch (m_taskType) {
         case LinearStretch: {
-                resultImg = PixelProcessor::linearStretch(m_inputImage);
-                msg = "线性拉伸完成"; 
-                break;
+            resultImg = PixelProcessor::linearStretch(m_inputImage);
+            msg = "线性拉伸完成"; 
+            break;
             }
         case HistEq:{
             resultImg = PixelProcessor::histEqualize(m_inputImage);

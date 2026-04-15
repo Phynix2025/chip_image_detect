@@ -450,6 +450,28 @@ QImage PixelProcessor::histEqualize(const QImage &input) {
     // return gray;
 }
 
+//固定阈值分割
+QImage PixelProcessor::fixedThreshold(const QImage &input,uchar thres){
+    QImage gray = toGray(input);
+    int w = gray.width(), h = gray.height();
+    QImage dst = gray.copy();
+    const uchar *sData = gray.constBits();
+    uchar *dData = dst.bits();
+    int stride = gray.bytesPerLine();
+
+    for(int i = 0; i < h; ++ i){
+        for (int j = 0; j < w; ++ j) {
+            int offset = i * stride + j;
+            if(sData[offset] < thres){
+                dData[offset] = 0;
+            }else {
+                dData[offset] = 255;
+            }
+        }
+    }
+    return dst;
+}
+
 // 自适应阈值 (使用积分图的局部均值)
 // 原理：对比每个像素与其周围 15x15 邻域的均值，能够有效克服光照不均的影响
 QImage PixelProcessor::adaptiveThreshold(const QImage &input) {
