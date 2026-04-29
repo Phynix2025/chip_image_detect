@@ -19,13 +19,12 @@ public:
     static DetectResult imageDiff(const QImage &input,const QImage &standard);
     //3. 阈值分割
     static DetectResult threshSeg(const QImage &input);
-    //4. 断点连接
-    static DetectResult pointLink(const QImage &input);
-    //5. 缺陷分析（连通域分析）
+    //4. 连通域分析
+    static DetectResult connectivityAnalysis(const QImage &input);
+    //5. 缺陷分析
     static DetectResult defectAnalysis(const QImage &input);
 
 private:
-    
 
 };
 

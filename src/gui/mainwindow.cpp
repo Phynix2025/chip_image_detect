@@ -100,7 +100,7 @@ void MainWindow::setupUi() {
     menuDet->addAction("模板匹配",this,[this](){startProcessingTask(ProcessingThread::TemplateMatch); });
     menuDet->addAction("图像差分",this,[this]() {startProcessingTask(ProcessingThread::ImageDiff); });
     menuDet->addAction("阈值分割",this,[this]() {startProcessingTask(ProcessingThread::ThreshSeg); });
-    menuDet->addAction("断点连接",this,[this]() {startProcessingTask(ProcessingThread::PointLink);} );
+    menuDet->addAction("连通域分析",this,[this]() {startProcessingTask(ProcessingThread::ConnectivityAnalysis);} );
     menuDet->addAction("缺陷分析",this,[this]() {startProcessingTask(ProcessingThread::DefectAnalysis);} );
     btnDet->setMenu(menuDet);
     toolbar->addWidget(btnDet);

@@ -97,8 +97,8 @@ void ProcessingThread::run() {
             
             break;
         }
-        case PointLink: {
-            DetectResult res = DefectAlgorithm::pointLink(m_inputImage);
+        case ConnectivityAnalysis: {
+            DetectResult res = DefectAlgorithm::connectivityAnalysis(m_inputImage);
             resultImg = res.resultImage;
             msg = res.message;
             

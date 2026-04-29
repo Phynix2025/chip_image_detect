@@ -3,14 +3,13 @@
 
 #include <climits>
 #include <cstdlib>
-#include <functional>
 #include <qimage.h>
 #include <qtypes.h>
 #include <QImage>
 #include <QPoint>
 #include <cmath>
 #include <algorithm>
-#include <vector> 
+#include <vector>
 
 /* 辅助函数 */
 // 暴力匹配
@@ -21,6 +20,8 @@ QImage pyramidTemplateMatch(const QImage &input, const QImage &standard);
 QImage perBytesDiff(const QImage &input,const QImage &standard);
 // 局部均值作差
 QImage localMeanDiff(const QImage &input,const QImage &standard);
+// 获取标签矩阵
+void getLabelMatrix(const QImage &input,const std::vector<std::vector<int>> &labelMatrix);
 
 /* 计算主函数 */
 // 模板匹配
@@ -58,56 +59,12 @@ DetectResult DefectAlgorithm::threshSeg(const QImage &input){
     return res;
 }
 
-DetectResult DefectAlgorithm::pointLink(const QImage &input){
-    DetectResult res;
-    // 首先采用 3*3 模板 开运算（腐蚀+膨胀）
-    QImage dst = input.copy();
-    int w = dst.width(), h = dst.height(), stride = dst.bytesPerLine();
-    uchar *pDst = dst.bits();
-    const uchar *pIpt = input.constBits();
+DetectResult DefectAlgorithm::connectivityAnalysis(const QImage &input){
+    // 1. 获得标签矩阵
+    int h = input.height(),w = input.width();
+    std::vector<std::vector<int>> labelMatrix(h,std::vector(w,0));
+    getLabelMatrix(input,labelMatrix);
 
-    //腐蚀
-    for (int i = 1; i < h -1; ++ i) {
-        for (int j = 1; j < w -1; ++ j) {
-            int offset = i * stride + j; //中心点偏移量
-            uchar minV = 255;
-
-            for(int dy = -1; dy <= 1; ++ dy){
-                for(int dx = -1; dx <= 1; ++ dx){
-                    int tmp_off = offset + dy * stride + dx;
-                    if(pIpt[tmp_off] < minV){
-                        minV = pIpt[tmp_off];
-                    }
-                }
-            }
-
-            pDst[offset] = minV;
-        }
-    }
-
-    res.resultImage = dst.copy();
-    uchar *pRes = res.resultImage.bits();
-    //膨胀
-    for (int i = 1; i < h -1; ++ i) {
-        for (int j = 1; j < w -1; ++ j) {
-            int offset = i * stride + j; //中心点偏移量
-            uchar maxV = 0;
-
-            for(int dy = -1; dy <= 1; ++ dy){
-                for(int dx = -1; dx <= 1; ++ dx){
-                    int tmp_off = offset + dy * stride + dx;
-                    if(pDst[tmp_off] > maxV){
-                        maxV = pDst[tmp_off];
-                    }
-                }
-            }
-
-            pRes[offset] = maxV;
-        }
-    }
-
-    res.message = "断点连接完成";
-    return res;
 }
 
 DetectResult DefectAlgorithm::defectAnalysis(const QImage &input){
@@ -330,4 +287,8 @@ QImage localMeanDiff(const QImage &input, const QImage &standard) {
     res = PixelProcessor::twoWayFilter(res);
 
     return res;
+}
+
+void getLabelMatrix(const QImage &input,const std::vector<std::vector<int>> &labelMatrix){
+
 }

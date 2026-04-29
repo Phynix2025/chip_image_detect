@@ -16,7 +16,7 @@ public:
         LinearStretch, HistEq, Gaussian, Laplacian, TwoWayFilter,Retinex, // 预处理
         AdaptiveThresh, Otsu,                        // 分割
         MorphOpen, MorphClose, Sobel, Prewitt,       // 特征提取
-        TemplateMatch,ImageDiff,ThreshSeg,PointLink,DefectAnalysis  // 缺陷检测
+        TemplateMatch,ImageDiff,ThreshSeg,ConnectivityAnalysis,DefectAnalysis  // 缺陷检测
     };
 
     ProcessingThread(TaskType type, const QImage &inputImage, const QImage &oriImage
