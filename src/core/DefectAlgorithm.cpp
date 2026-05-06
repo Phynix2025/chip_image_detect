@@ -10,6 +10,7 @@
 #include <cmath>
 #include <algorithm>
 #include <vector>
+#include <unordered_map>
 
 /* 辅助函数 */
 // 暴力匹配
@@ -20,8 +21,6 @@ QImage pyramidTemplateMatch(const QImage &input, const QImage &standard);
 QImage perBytesDiff(const QImage &input,const QImage &standard);
 // 局部均值作差
 QImage localMeanDiff(const QImage &input,const QImage &standard);
-// 获取标签矩阵
-void getLabelMatrix(const QImage &input,const std::vector<std::vector<int>> &labelMatrix);
 
 /* 计算主函数 */
 // 模板匹配
@@ -60,11 +59,18 @@ DetectResult DefectAlgorithm::threshSeg(const QImage &input){
 }
 
 DetectResult DefectAlgorithm::connectivityAnalysis(const QImage &input){
+    DetectResult res;
+    
     // 1. 获得标签矩阵
     int h = input.height(),w = input.width();
     std::vector<std::vector<int>> labelMatrix(h,std::vector(w,0));
     getLabelMatrix(input,labelMatrix);
 
+    // 2. 特征提取
+    
+
+    res.message = "连通域分析完成";
+    return res;
 }
 
 DetectResult DefectAlgorithm::defectAnalysis(const QImage &input){
@@ -289,6 +295,99 @@ QImage localMeanDiff(const QImage &input, const QImage &standard) {
     return res;
 }
 
-void getLabelMatrix(const QImage &input,const std::vector<std::vector<int>> &labelMatrix){
+// 辅助函数：并查集的 Find 操作（带路径压缩）
+int findRoot(std::vector<int>& parent, int i) {
+    if (parent[i] == i) {
+        return i;
+    }
+    // 路径压缩：直接将当前节点挂到根节点下，极大提升后续查找速度
+    return parent[i] = findRoot(parent, parent[i]);
+}
 
+// 辅助函数：并查集的 Union 操作
+void unionLabels(std::vector<int>& parent, int i, int j) {
+    int rootI = findRoot(parent, i);
+    int rootJ = findRoot(parent, j);
+    if (rootI != rootJ) {
+        // 将较大的根节点指向较小的根节点，保持标签值尽量小
+        if (rootI < rootJ) {
+            parent[rootJ] = rootI;
+        } else {
+            parent[rootI] = rootJ;
+        }
+    }
+}
+
+void DefectAlgorithm::getLabelMatrix(const QImage &input, std::vector<std::vector<int>> &labelMatrix) {
+    int width = input.width();
+    int height = input.height();
+
+    // 1. 初始化标签矩阵和并查集
+    // 矩阵大小初始化为 height x width，全部填 0（背景）
+    labelMatrix.assign(height, std::vector<int>(width, 0));
+    
+    std::vector<int> parent;
+    parent.push_back(0); // 索引 0 保留给背景，不参与并查集逻辑
+
+    int nextLabel = 1;
+
+    // 2. 第一遍扫描 (First Pass)
+    for (int y = 0; y < height; ++y) {
+        // 【核心优化】：获取当前行的只读内存指针，速度比 pixel() 快几十倍
+        const uchar* line = input.constScanLine(y); 
+        
+        for (int x = 0; x < width; ++x) {
+            // 注意：这里假设输入的 QImage 是 8位灰度图 (Format_Grayscale8 或 Format_Indexed8)
+            // 如果你的图是 32位 RGB，需要改成：int pixelVal = qRed(((QRgb*)line)[x]);
+            int pixelVal = line[x];
+
+            // 假设前景（划痕/焊盘）为白色 (值 > 128)
+            if (pixelVal > 128) { 
+                int leftLabel = (x > 0) ? labelMatrix[y][x - 1] : 0;
+                int topLabel  = (y > 0) ? labelMatrix[y - 1][x] : 0;
+
+                if (leftLabel == 0 && topLabel == 0) {
+                    // 情况 A：孤立点，左上都没标签，分配新标签
+                    labelMatrix[y][x] = nextLabel;
+                    parent.push_back(nextLabel);
+                    nextLabel++;
+                } else if (leftLabel != 0 && topLabel == 0) {
+                    // 情况 B1：只有左边有标签
+                    labelMatrix[y][x] = leftLabel;
+                } else if (leftLabel == 0 && topLabel != 0) {
+                    // 情况 B2：只有上边有标签
+                    labelMatrix[y][x] = topLabel;
+                } else {
+                    // 情况 C：左边和上边都有标签（遭遇合并）
+                    labelMatrix[y][x] = std::min(leftLabel, topLabel);
+                    if (leftLabel != topLabel) {
+                        // 记录连通域的等价关系
+                        unionLabels(parent, leftLabel, topLabel);
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. 整理并查集，并压缩标签使之连续 (Continuous Labeling)
+    // 这一步能把 [1, 2, 5, 8] 这种断层的标签映射为 [1, 2, 3, 4]
+    std::vector<int> finalLabels(parent.size(), 0);
+    int currentValidLabel = 1;
+    for (int i = 1; i < parent.size(); ++i) {
+        int root = findRoot(parent, i);
+        if (finalLabels[root] == 0) {
+            finalLabels[root] = currentValidLabel++; // 发现新的有效根，分配连续编号
+        }
+        finalLabels[i] = finalLabels[root]; // 让所有子节点直接指向连续编号
+    }
+
+    // 4. 第二遍扫描 (Second Pass) - 贴上正式标签
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            if (labelMatrix[y][x] > 0) {
+                // 通过查表，直接替换为最终的连续标签
+                labelMatrix[y][x] = finalLabels[labelMatrix[y][x]];
+            }
+        }
+    }
 }
