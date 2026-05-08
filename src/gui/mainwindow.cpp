@@ -319,7 +319,7 @@ void MainWindow::startProcessingTask(ProcessingThread::TaskType taskType){
     //this->setEnabled(false);
 
     //创建子线程
-    ProcessingThread *thread = new ProcessingThread(taskType,currentImage,oriImage,standard,this);
+    ProcessingThread *thread = new ProcessingThread(taskType,currentImage,oriImage,standard,curRes,this);
 
     //连接信号与槽
     //线程发送 resultReady ，由主线程的 onProcessingFinished 接受
@@ -333,7 +333,7 @@ void MainWindow::startProcessingTask(ProcessingThread::TaskType taskType){
 }
 
 //接收子线程对的结果
-void MainWindow::onProcessingFinished(QImage resultImage,QString message){
+void MainWindow::onProcessingFinished(QImage resultImage,QString message,DetectResult thRes){
     //恢复窗口交互
     //this->setEnabled(true);
 
@@ -345,6 +345,8 @@ void MainWindow::onProcessingFinished(QImage resultImage,QString message){
 
     //入栈，刷新界面
     applyProcessedImage(resultImage,message);
+    // 更新检测结果
+    curRes = thRes;
 }
 
 

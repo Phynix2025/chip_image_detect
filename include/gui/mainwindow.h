@@ -35,7 +35,7 @@ private slots:
     //void onActionDetect();
     void onUndo();
     //处理接收子线程处理完毕的信号
-    void onProcessingFinished(QImage resultImage,QString message);
+    void onProcessingFinished(QImage resultImage,QString message,DetectResult thRes);
 private:
     void setupUi();
     void loadImages();
@@ -74,6 +74,7 @@ private:
     QImage oriImage;//保留当期的原始图像
     QImage standard; //标准图像
 
+    DetectResult curRes; //保存检测结果
 };
 
 #endif // MAINWINDOW_H

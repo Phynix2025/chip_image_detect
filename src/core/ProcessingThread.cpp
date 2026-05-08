@@ -3,9 +3,9 @@
 #include "core/DefectAlgorithm.h"
 
 ProcessingThread::ProcessingThread(TaskType type, const QImage &inputImage, const QImage &oriImage
-                    ,const QImage &standard,QObject *parent)
+                    ,const QImage &standard,DetectResult curRes,QObject *parent)
     : QThread(parent), m_taskType(type), m_inputImage(inputImage),m_oriImage(oriImage),m_standardImage(
-        standard) {
+          standard),thRes(curRes) {
 
 }
 
@@ -98,14 +98,14 @@ void ProcessingThread::run() {
             break;
         }
         case ConnectivityAnalysis: {
-            DetectResult res = DefectAlgorithm::connectivityAnalysis(m_inputImage);
+            DetectResult res = DefectAlgorithm::connectivityAnalysis(m_inputImage,thRes);
             resultImg = res.resultImage;
             msg = res.message;
             
             break;
         }
         case DefectAnalysis: {
-            DetectResult res = DefectAlgorithm::defectAnalysis(m_inputImage);
+            DetectResult res = DefectAlgorithm::defectAnalysis(m_inputImage,thRes);
             resultImg = res.resultImage;
             msg = res.message;
             
@@ -119,5 +119,5 @@ void ProcessingThread::run() {
     }
 
     // 处理完毕，发射信号将数据安全投递回主线程
-    emit resultReady(resultImg, msg);
+    emit resultReady(resultImg, msg,thRes);
 }
