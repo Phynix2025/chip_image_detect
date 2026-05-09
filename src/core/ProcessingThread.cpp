@@ -91,14 +91,14 @@ void ProcessingThread::run() {
             break;
         }
         case ThreshSeg: {
-            DetectResult res = DefectAlgorithm::threshSeg(m_inputImage);
+            DetectResult res = DefectAlgorithm::threshSeg(m_inputImage,m_standardImage);
             resultImg = res.resultImage;
             msg = res.message;
             
             break;
         }
         case ConnectivityAnalysis: {
-            DetectResult res = DefectAlgorithm::connectivityAnalysis(m_inputImage,thRes);
+            DetectResult res = DefectAlgorithm::connectivityAnalysis(m_inputImage,thRes,m_standardImage);
             resultImg = res.resultImage;
             msg = res.message;
             

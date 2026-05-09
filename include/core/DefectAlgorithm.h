@@ -27,6 +27,14 @@ struct ComponentStats {
         if (shortSide == 0) return 1.0; 
         return static_cast<double>(longSide) / shortSide;
     }
+    // 计算外接矩形填充率
+    double getExtent() const {
+        int width = maxX - minX + 1;
+        int height = maxY - minY + 1;
+        int boundingBoxArea = width * height;
+        if (boundingBoxArea == 0) return 1.0;
+        return static_cast<double>(area) / boundingBoxArea;
+    }
 };
 
 // 用于统一返回检测后的图像和文字结果
@@ -46,9 +54,10 @@ public:
     //2. 图像差分 
     static DetectResult imageDiff(const QImage &input,const QImage &standard);
     //3. 阈值分割
-    static DetectResult threshSeg(const QImage &input);
+    static DetectResult threshSeg(const QImage &input,QImage &standard);
     //4. 连通域分析
-    static DetectResult connectivityAnalysis(const QImage &input,DetectResult &curRes);
+    static DetectResult connectivityAnalysis(const QImage &input,DetectResult &curRes,
+                                            QImage &standard);
     //5. 缺陷分析
     static DetectResult defectAnalysis(const QImage &input,DetectResult &curRes);
 

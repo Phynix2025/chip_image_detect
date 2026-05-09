@@ -31,12 +31,12 @@ DetectResult DefectAlgorithm::templateMatch(QImage &input,QImage &standard){
     DetectResult res;
     // 优化：在模板匹配之前预处理，减少噪点光照等因素干扰
     standard = PixelProcessor::twoWayFilter(standard);
-    standard = PixelProcessor::Retinex(standard);
-    standard = PixelProcessor::sobel(standard);
+    //standard = PixelProcessor::Retinex(standard);
+    //standard = PixelProcessor::sobel(standard);
 
     input = PixelProcessor::twoWayFilter(input);
-    input = PixelProcessor::Retinex(input);
-    input = PixelProcessor::sobel(input);
+    //input = PixelProcessor::Retinex(input);
+    //input = PixelProcessor::sobel(input);
 
     res.resultImage = pyramidTemplateMatch(input, standard);
     res.message = "模板匹配完成(已预处理)";
@@ -53,24 +53,31 @@ DetectResult DefectAlgorithm::imageDiff(const QImage &input,const QImage &standa
     return res;
 }
 
-DetectResult DefectAlgorithm::threshSeg(const QImage &input){
+DetectResult DefectAlgorithm::threshSeg(const QImage &input,QImage &standard){
     DetectResult res;
-    res.resultImage = PixelProcessor::fixedThreshold(input,50);
+    res.resultImage = PixelProcessor::otsuThreshold(input);
+    //同时对standard进行阈值分割
+    standard = PixelProcessor::otsuThreshold(standard);
     res.message = "阈值分割完成";
     return res;
 }
 
-DetectResult DefectAlgorithm::connectivityAnalysis(const QImage &input,DetectResult &curRes){
+DetectResult DefectAlgorithm::connectivityAnalysis(const QImage &input,DetectResult &curRes,
+                                                    QImage &standard){
 
     // 1. 获得标签矩阵
     getLabelMatrix(input,curRes.labelMatrix);
 
     // 2. 特征提取，去除小噪点，得到只含有可能缺陷的图像
     curRes.resultImage = featureExtraction(input,curRes.labelMatrix,curRes.validDefects);
+    // 同时对标准图连通域分析
+    std::vector<std::vector<int>> stdLabelMatrix;
+    getLabelMatrix(standard,stdLabelMatrix);
+    std::vector<ComponentStats> stdValidDefects;
+    standard = featureExtraction(standard,stdLabelMatrix,stdValidDefects);
     curRes.message = "连通域分析完成";
     return curRes;
 }
-
 
 DetectResult DefectAlgorithm::defectAnalysis(const QImage &input, DetectResult &curRes) {
     // 1. 特征分类：基于先验规则对提取出的连通域进行定性
@@ -429,8 +436,8 @@ QImage DefectAlgorithm::featureExtraction(const QImage &input,
     }
 
     // 2. 缺陷规则筛选
-    int MIN_DEFECT_AREA = 250;        // 面积下限：滤除微小噪点
-    int MAX_DEFECT_AREA = 15000;      // 面积上限：滤除大块的背景误判
+    int MIN_DEFECT_AREA = 320;        // 面积下限：滤除微小噪点和月牙状芯片引脚
+    int MAX_DEFECT_AREA = 150000;      // 面积上限：滤除大块的背景误判
     double MAX_ASPECT_RATIO = 15.0;   // 长宽比上限：滤除极度细长的非缺陷干扰
 
     std::unordered_set<int> validLabels; // 存放判定为真实缺陷的标签 ID
@@ -473,18 +480,27 @@ QImage DefectAlgorithm::featureExtraction(const QImage &input,
 void DefectAlgorithm::classifyFeatures(std::vector<ComponentStats> &defects, int imgWidth, int imgHeight) {
     for (auto &defect : defects) {
         double ratio = defect.getAspectRatio();
+        double extent = defect.getExtent(); // 获取填充率
 
-        // 简单设定边界区域约束：如果外接矩形极度靠近图像边缘 (例如 10 像素以内)
-        bool nearEdge = (defect.minX < 10 || defect.minY < 10 ||
-                         defect.maxX > imgWidth - 10 || defect.maxY > imgHeight - 10);
+        int width = defect.maxX - defect.minX + 1;
+        int height = defect.maxY - defect.minY + 1;
+        int maxSide = std::max(width, height); // 获取最长边的跨度
 
-        // 专家决策树分类逻辑 (数值可依实际芯片调整)
+        // 边缘约束判定
+        bool nearEdge = (defect.minX < 5 || defect.minY < 5 ||
+                         defect.maxX > imgWidth - 5 || defect.maxY > imgHeight - 5);
+
         if (nearEdge) {
             defect.defectType = 2; // 类别 2：崩边 (致命缺陷)
-        } else if (ratio > 3.0) {
-            defect.defectType = 1; // 类别 1：划痕 (狭长形态)
-        } else {
-            defect.defectType = 3; // 类别 3：异物/表面污点 (常规形态)
+        }
+        // 【核心修改】划痕判定双保险：
+        // 1. 横平竖直的划痕 (ratio > 3.0)
+        // 2. 对角线斜划痕 (跨度很大 maxSide > 50，但内部极度空洞 extent < 0.2)
+        else if (ratio > 3.0 || (maxSide > 50 && extent < 0.20)) {
+            defect.defectType = 1; // 类别 1：划痕
+        }
+        else {
+            defect.defectType = 3; // 类别 3：异物/表面污点
         }
     }
 }
@@ -502,14 +518,14 @@ void DefectAlgorithm::globalAnalysis(const std::vector<ComponentStats> &defects,
     // 遍历统计全局受损情况
     for (const auto &defect : defects) {
         totalDefectArea += defect.area;
-        if (defect.defectType == 2 || defect.defectType == 1) {
+        if (defect.defectType == 2) {
             hasCriticalDefect = true; // 只要有 1 处崩边，即判死刑
         }
     }
 
     // 综合判定逻辑
     if (hasCriticalDefect) {
-        message = "检测不合格 (NG)：发现致命边缘破损！";
+        message = "检测不合格 (NG)：缺陷区域太多！";
     } else if (totalDefectArea > 3000) {
         message = QString("检测不合格 (NG)：表面缺陷总面积超标 (%1 px)。").arg(totalDefectArea);
     } else {
