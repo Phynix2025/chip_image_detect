@@ -35,7 +35,7 @@ private slots:
     //void onActionDetect();
     void onUndo();
     //处理接收子线程处理完毕的信号
-    void onProcessingFinished(QImage resultImage,QString message,DetectResult thRes);
+    void onProcessingFinished(QImage resultImage,QString message,DetectResult thRes,QImage stdImg);
 private:
     void setupUi();
     void loadImages();

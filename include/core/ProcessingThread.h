@@ -29,7 +29,7 @@ protected:
 
 signals:
     // 跨线程传递结果
-    void resultReady(QImage resultImage, QString message,DetectResult curRes);
+    void resultReady(QImage resultImage, QString message,DetectResult curRes,QImage stdImg);
 
 private:
     TaskType m_taskType;

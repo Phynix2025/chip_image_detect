@@ -333,7 +333,8 @@ void MainWindow::startProcessingTask(ProcessingThread::TaskType taskType){
 }
 
 //接收子线程对的结果
-void MainWindow::onProcessingFinished(QImage resultImage,QString message,DetectResult thRes){
+void MainWindow::onProcessingFinished(QImage resultImage,QString message,
+                                      DetectResult thRes,QImage stdImg){
     //恢复窗口交互
     //this->setEnabled(true);
 
@@ -347,6 +348,8 @@ void MainWindow::onProcessingFinished(QImage resultImage,QString message,DetectR
     applyProcessedImage(resultImage,message);
     // 更新检测结果
     curRes = thRes;
+    // 更新标准图像的数据对象（不是改变图像）
+    standard = stdImg;
 }
 
 

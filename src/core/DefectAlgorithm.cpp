@@ -31,11 +31,11 @@ DetectResult DefectAlgorithm::templateMatch(QImage &input,QImage &standard){
     DetectResult res;
     // 优化：在模板匹配之前预处理，减少噪点光照等因素干扰
     standard = PixelProcessor::twoWayFilter(standard);
-    //standard = PixelProcessor::Retinex(standard);
+    standard = PixelProcessor::Retinex(standard);
     //standard = PixelProcessor::sobel(standard);
 
     input = PixelProcessor::twoWayFilter(input);
-    //input = PixelProcessor::Retinex(input);
+    input = PixelProcessor::Retinex(input);
     //input = PixelProcessor::sobel(input);
 
     res.resultImage = pyramidTemplateMatch(input, standard);

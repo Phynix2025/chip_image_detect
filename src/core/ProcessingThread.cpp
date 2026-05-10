@@ -119,5 +119,5 @@ void ProcessingThread::run() {
     }
 
     // 处理完毕，发射信号将数据安全投递回主线程
-    emit resultReady(resultImg, msg,thRes);
+    emit resultReady(resultImg, msg,thRes,m_standardImage);
 }
