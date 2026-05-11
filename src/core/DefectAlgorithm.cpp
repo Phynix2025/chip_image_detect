@@ -159,7 +159,7 @@ QImage pyramidTemplateMatch(const QImage &input, const QImage &standard) {
     int guessY1 = bestL2.y() * 2;
     
     // 微调的搜索半径
-    int searchRadius = 3; 
+    int searchRadius = 5;
 
     QPoint bestL1 = matchInRegion(inL1, stdL1, 
                                   guessX1 - searchRadius, guessX1 + searchRadius,
