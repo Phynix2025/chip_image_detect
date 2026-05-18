@@ -437,7 +437,7 @@ QImage DefectAlgorithm::featureExtraction(const QImage &input,
 
     // 2. 缺陷规则筛选
     int MIN_DEFECT_AREA = 320;        // 面积下限：滤除微小噪点和月牙状芯片引脚
-    int MAX_DEFECT_AREA = 150000;      // 面积上限：滤除大块的背景误判
+    int MAX_DEFECT_AREA = 1500;      // 面积上限：滤除大块的背景误判
     double MAX_ASPECT_RATIO = 15.0;   // 长宽比上限：滤除极度细长的非缺陷干扰
 
     std::unordered_set<int> validLabels; // 存放判定为真实缺陷的标签 ID
@@ -525,7 +525,7 @@ void DefectAlgorithm::globalAnalysis(const std::vector<ComponentStats> &defects,
 
     // 综合判定逻辑
     if (hasCriticalDefect) {
-        message = "检测不合格 (NG)：缺陷区域太多！";
+        message = "检测不合格 (NG)：存在划痕。";
     } else if (totalDefectArea > 3000) {
         message = QString("检测不合格 (NG)：表面缺陷总面积超标 (%1 px)。").arg(totalDefectArea);
     } else {
@@ -533,7 +533,7 @@ void DefectAlgorithm::globalAnalysis(const std::vector<ComponentStats> &defects,
     }
 }
 
-// 辅助函数 3：结果可视化输出
+// 辅助函数 结果可视化输出
 QImage DefectAlgorithm::visualizeResults(const QImage &input, const std::vector<ComponentStats> &defects) {
     // 将原图转为 RGB 格式，以便绘制彩色标注
     QImage output = input.convertToFormat(QImage::Format_RGB888);
@@ -547,11 +547,12 @@ QImage DefectAlgorithm::visualizeResults(const QImage &input, const std::vector<
         // 根据缺陷类型选用不同的画笔颜色
         QString typeLabel;
         if (defect.defectType == 1) {
-            painter.setPen(QPen(Qt::yellow, 2));
-            typeLabel = "Scratch";
+            painter.setPen(QPen(Qt::red, 2));
+            typeLabel = "划痕";
         } else if (defect.defectType == 2) {
-            painter.setPen(QPen(Qt::red, 3));
-            typeLabel = "Chipping";
+            // 图像边缘未对齐，不做处理
+            //painter.setPen(QPen(Qt::red, 3));
+            //typeLabel = "划痕";
         } else {
             painter.setPen(QPen(Qt::red, 2));
             typeLabel = "划痕";
