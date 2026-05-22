@@ -345,7 +345,7 @@ void DefectAlgorithm::getLabelMatrix(const QImage &input,std::vector<std::vector
 
     // 2. 第一遍扫描 (First Pass)
     for (int y = 0; y < height; ++y) {
-        // 【核心优化】：获取当前行的只读内存指针，速度比 pixel() 快几十倍
+        // 获取当前行的只读内存指针，速度比 pixel() 快几十倍
         const uchar* line = input.constScanLine(y); 
         
         for (int x = 0; x < width; ++x) {
@@ -436,13 +436,13 @@ QImage DefectAlgorithm::featureExtraction(const QImage &input,
     }
 
     // 2. 缺陷规则筛选
-    int MIN_DEFECT_AREA = 320;        // 面积下限：滤除微小噪点和月牙状芯片引脚
+    int MIN_DEFECT_AREA = 330;        // 面积下限：滤除微小噪点和月牙状芯片引脚
     int MAX_DEFECT_AREA = 1500;      // 面积上限：滤除大块的背景误判
     double MAX_ASPECT_RATIO = 15.0;   // 长宽比上限：滤除极度细长的非缺陷干扰
 
     std::unordered_set<int> validLabels; // 存放判定为真实缺陷的标签 ID
 
-    // 【重要安全防范】：清空外部传入的 vector，防止多次调用时数据累积脏乱
+    //清空外部传入的 vector，防止多次调用时数据累积脏乱
     validDefects.clear();
 
     for (const auto& pair : statsMap) {
@@ -456,7 +456,7 @@ QImage DefectAlgorithm::featureExtraction(const QImage &input,
             // 记录到 Set 中，方便步骤 3 快速查表重建图像
             validLabels.insert(stats.labelId);
 
-            // 【核心修复】：把合格的特征实体完整打包，传给外部的 validDefects 数组！
+            // 把合格的特征实体完整打包，传给外部的 validDefects 数组！
             validDefects.push_back(stats);
         }
     }
@@ -493,7 +493,7 @@ void DefectAlgorithm::classifyFeatures(std::vector<ComponentStats> &defects, int
         if (nearEdge) {
             defect.defectType = 2; // 类别 2：崩边 (致命缺陷)
         }
-        // 【核心修改】划痕判定双保险：
+        // 划痕判定双保险：
         // 1. 横平竖直的划痕 (ratio > 3.0)
         // 2. 对角线斜划痕 (跨度很大 maxSide > 50，但内部极度空洞 extent < 0.2)
         else if (ratio > 3.0 || (maxSide > 50 && extent < 0.20)) {

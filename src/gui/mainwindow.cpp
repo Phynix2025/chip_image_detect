@@ -105,9 +105,7 @@ void MainWindow::setupUi() {
     btnDet->setMenu(menuDet);
     toolbar->addWidget(btnDet);
 
-    // ====================
     // 2. 核心布局 (3:2 分配)
-    // ====================
     QWidget *centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
     QHBoxLayout *mainLayout = new QHBoxLayout(centralWidget);
@@ -125,12 +123,12 @@ void MainWindow::setupUi() {
     imageView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     imageView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
-    // 【新增】缩放与交互配置
+    // 缩放与交互配置
     imageView->setTransformationAnchor(QGraphicsView::AnchorUnderMouse); // 关键：以鼠标光标所在位置为中心进行缩放
     imageView->setResizeAnchor(QGraphicsView::AnchorUnderMouse);
     imageView->setDragMode(QGraphicsView::ScrollHandDrag); // 允许鼠标左键按住拖拽平移图像
 
-    // 【新增】给 imageView 的视口安装事件过滤器，由 MainWindow 来拦截事件
+    // 给 imageView 的视口安装事件过滤器，由 MainWindow 来拦截事件
     imageView->viewport()->installEventFilter(this);
 
     // 左右切换按钮
@@ -304,10 +302,7 @@ void MainWindow::applyProcessedImage(const QImage &newImage, const QString &resu
     }
 }
 
-// ==========================================
 // 业务逻辑槽函数实现 (异步线程调用)
-// ==========================================
-
 void MainWindow::startProcessingTask(ProcessingThread::TaskType taskType){
     if(currentImage.isNull()) return;
 
@@ -363,7 +358,6 @@ void MainWindow::onActionSaveAs() {
         }
     }
 }
-
 
 void MainWindow::onUndo() {
     if (!undoStack.isEmpty()) {
