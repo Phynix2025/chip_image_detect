@@ -17,7 +17,7 @@ struct ComponentStats {
     // 用于记录分类结果（例如：0=未知, 1=划痕, 2=崩边, 3=异物）
     int defectType = 0;
     
-    // 计算外接矩形的长宽比 (永远用长边除以短边，保证比例 >= 1.0)
+    // 计算外接矩形的长宽比 (用长边除以短边)
     double getAspectRatio() const {
         int width = maxX - minX + 1;
         int height = maxY - minY + 1;

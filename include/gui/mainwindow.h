@@ -46,8 +46,6 @@ private:
     void refreshGraphicsView();
     void startProcessingTask(ProcessingThread::TaskType taskType);
 
-
-    // 核心显示组件：为了后续的缩放和画框，必须使用 Graphics 框架
     QGraphicsView *imageView;
     QGraphicsScene *imageScene;
     QGraphicsPixmapItem *pixmapItem;

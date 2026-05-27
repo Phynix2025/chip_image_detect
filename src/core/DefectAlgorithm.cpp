@@ -83,11 +83,10 @@ DetectResult DefectAlgorithm::defectAnalysis(const QImage &input, DetectResult &
     // 1. 特征分类：基于先验规则对提取出的连通域进行定性
     classifyFeatures(curRes.validDefects, input.width(), input.height());
 
-    // 2. 全局分析：根据分类结果与面积，下达 OK/NG 判决
-    // 建议在 DetectResult 结构体中加一个 bool isOK; 字段，这里我们先用 message 承载结论
+    // 2. 全局分析：根据分类结果与面积，下达 OK/NG 判决论
     globalAnalysis(curRes.validDefects, curRes.message);
 
-    // 3. 结果可视化：在原图上绘制彩色边界框（Bounding Box）
+    // 3. 结果可视化：在原图上绘制彩色边界框
     curRes.resultImage = visualizeResults(input, curRes.validDefects);
 
     return curRes;
@@ -236,7 +235,7 @@ QImage perBytesDiff(const QImage &input,const QImage &standard){
     // 图像大小
     const int wStd = standard.width(),hStd = standard.height();
     const int wIpt = input.width(),hIpt = input.height();
-    // 差分图大小，防止指针越界（虽然正常处理不会越界，但是防止用户有错误操作）
+    // 防止指针越界
     const int wRes = std::min(wStd,wIpt),hRes = std::min(hStd,hIpt);
     // 每一行内存字节数
     const int lRes = std::min(input.bytesPerLine(),standard.bytesPerLine()); 
@@ -343,14 +342,11 @@ void DefectAlgorithm::getLabelMatrix(const QImage &input,std::vector<std::vector
 
     int nextLabel = 1;
 
-    // 2. 第一遍扫描 (First Pass)
+    // 2. 第一遍扫描
     for (int y = 0; y < height; ++y) {
-        // 获取当前行的只读内存指针，速度比 pixel() 快几十倍
         const uchar* line = input.constScanLine(y); 
         
         for (int x = 0; x < width; ++x) {
-            // 注意：这里假设输入的 QImage 是 8位灰度图 (Format_Grayscale8 或 Format_Indexed8)
-            // 如果你的图是 32位 RGB，需要改成：int pixelVal = qRed(((QRgb*)line)[x]);
             int pixelVal = line[x];
 
             // 假设前景（划痕/焊盘）为白色 (值 > 128)
@@ -381,7 +377,7 @@ void DefectAlgorithm::getLabelMatrix(const QImage &input,std::vector<std::vector
         }
     }
 
-    // 3. 整理并查集，并压缩标签使之连续 (Continuous Labeling)
+    // 3. 整理并查集，并压缩标签使之连续
     // 这一步能把 [1, 2, 5, 8] 这种断层的标签映射为 [1, 2, 3, 4]
     std::vector<int> finalLabels(parent.size(), 0);
     int currentValidLabel = 1;
@@ -393,7 +389,7 @@ void DefectAlgorithm::getLabelMatrix(const QImage &input,std::vector<std::vector
         finalLabels[i] = finalLabels[root]; // 让所有子节点直接指向连续编号
     }
 
-    // 4. 第二遍扫描 (Second Pass) - 贴上正式标签
+    // 4. 第二遍扫描  - 贴上正式标签
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
             if (labelMatrix[y][x] > 0) {
@@ -442,7 +438,6 @@ QImage DefectAlgorithm::featureExtraction(const QImage &input,
 
     std::unordered_set<int> validLabels; // 存放判定为真实缺陷的标签 ID
 
-    //清空外部传入的 vector，防止多次调用时数据累积脏乱
     validDefects.clear();
 
     for (const auto& pair : statsMap) {
@@ -493,9 +488,7 @@ void DefectAlgorithm::classifyFeatures(std::vector<ComponentStats> &defects, int
         if (nearEdge) {
             defect.defectType = 2; // 类别 2：崩边 (致命缺陷)
         }
-        // 划痕判定双保险：
-        // 1. 横平竖直的划痕 (ratio > 3.0)
-        // 2. 对角线斜划痕 (跨度很大 maxSide > 50，但内部极度空洞 extent < 0.2)
+        // 划痕判定：
         else if (ratio > 3.0 || (maxSide > 50 && extent < 0.20)) {
             defect.defectType = 1; // 类别 1：划痕
         }
